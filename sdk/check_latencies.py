@@ -14,7 +14,10 @@ TEST_BUCKET = "ob_gcp_exploration"
 def upload_download_delete_cycle(num_cycles_per_worker, profile=False):
     t = time.time()
 
-    storage_client = storage.Client()
+    import google.auth
+
+    credentials, project_id = google.auth.default()
+    storage_client = storage.Client(credentials=credentials, project=project_id)
     bucket = storage_client.bucket(TEST_BUCKET)
     if profile:
         print("A: %.2f" % (time.time() - t))
