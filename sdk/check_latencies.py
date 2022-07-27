@@ -42,7 +42,7 @@ def do_it(num_generations, multiplier, use_processes, num_cycles_per_worker):
     t = time.time()
     for f in warm_up_futures:
         f.result()
-    print("Warm-up complete (took %.2f seconds)" % time.time() - t)
+    print("Warm-up complete (took %.2f seconds)" % (time.time() - t))
 
     for gen in range(num_generations):
         parallelism = multiplier ** gen
