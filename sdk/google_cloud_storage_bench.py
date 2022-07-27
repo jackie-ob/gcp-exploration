@@ -43,7 +43,7 @@ def generate_randbytes(size_mb: int):
     return result
 
 
-SIZE_MB = 1
+SIZE_MB = 500
 PARALLEL_BLOB_OPERATIONS = 10
 TEST_BLOB_FN = lambda n: "test-blob-%d" % n
 TEST_BUCKET = "ob_gcp_exploration"
