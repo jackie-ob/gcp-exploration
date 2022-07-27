@@ -18,16 +18,17 @@ def upload_download_delete_cycle(num_cycles_per_worker, profile=False, credentia
     if profile:
         print("A: %.2f" % (time.time() - t))
     for _ in range(num_cycles_per_worker):
-        q0 = time.time()
         blob_name = "check_latencies_" + str(uuid.uuid4())
         blob = bucket.blob(blob_name)
         q1 = time.time()
+        blob.upload_from_file(io.BytesIO(b''))
+        q1point5 = time.time()
         if profile:
-            print("blob: %.2f" % (q1 - q0))
+            print("BB: %.2f" % (q1point5 - q1))
         blob.upload_from_file(io.BytesIO(b''))
         q2 = time.time()
         if profile:
-            print("B: %.2f" % (q2 - q1))
+            print("B: %.2f" % (q2 - q1point5))
         assert len(blob.download_as_bytes()) == 0
         q3 = time.time()
         if profile:
