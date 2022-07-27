@@ -19,9 +19,12 @@ def upload_download_delete_cycle(num_cycles_per_worker, profile=False):
     if profile:
         print("A: %.2f" % (time.time() - t))
     for _ in range(num_cycles_per_worker):
-        q1 = time.time()
+        q0 = time.time()
         blob_name = "check_latencies_" + str(uuid.uuid4())
         blob = bucket.blob(blob_name)
+        q1 = time.time()
+        if profile:
+            print("blob: %.2f" % (q1 - q0))
         blob.upload_from_file(io.BytesIO(b''))
         q2 = time.time()
         if profile:
