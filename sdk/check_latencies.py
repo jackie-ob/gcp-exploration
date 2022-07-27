@@ -25,6 +25,8 @@ def upload_download_delete_cycle(num_cycles_per_worker, profile=False, use_cache
     bucket = storage_client.bucket(TEST_BUCKET)
     if profile:
         print("A: %.2f" % (time.time() - t))
+
+    bbs = []
     for _ in range(num_cycles_per_worker):
         blob_name = "check_latencies_" + str(uuid.uuid4())
         blob = bucket.blob(blob_name)
@@ -33,6 +35,7 @@ def upload_download_delete_cycle(num_cycles_per_worker, profile=False, use_cache
         q1point5 = time.time()
         if profile:
             print("BB: %.2f" % (q1point5 - q1))
+        bbs.append(q1point5 - q1)
         blob.upload_from_file(io.BytesIO(b''))
         q2 = time.time()
         if profile:
@@ -45,7 +48,7 @@ def upload_download_delete_cycle(num_cycles_per_worker, profile=False, use_cache
         q4 = time.time()
         if profile:
             print("D: %.2f" % (q4 - q3))
-    return time.time() - t
+    return time.time() - t, bbs
 
 
 def noop():
@@ -71,14 +74,18 @@ def do_it(num_generations, multiplier, use_processes, num_cycles_per_worker):
         f.result()
     print("Warm-up complete (took %.2f seconds)" % (time.time() - t))
 
+    first_bb_per_generation = []
     for gen in range(num_generations):
         parallelism = multiplier ** gen
         print("Processing generation %d (%d workers at a time)" % (gen, parallelism))
         futures = []
         for i in range(parallelism):
-            f = pool.submit(upload_download_delete_cycle, num_cycles_per_worker, profile=bool(i == 0), use_cached_client=use_cached_client)
+            f = pool.submit(upload_download_delete_cycle, num_cycles_per_worker, profile=bool(i == 0), use_cached_client=False)
             futures.append(f)
-        latencies = [f.result() for f in futures]
+        results = [f.result() for f in futures]
+        latencies = [r[0] for r in results]
+        bbss = results[0][1]
+        first_bb_per_generation.append(bbss[0])
         mean = statistics.mean(latencies)
         stdev = -1
         if len(latencies) > 1:
@@ -86,6 +93,9 @@ def do_it(num_generations, multiplier, use_processes, num_cycles_per_worker):
         mean_per_operation = mean / (num_cycles_per_worker * 3)
         print("Gen %d (x %d): mean=%.3f stdev=%.3f mean_per_operation=%.3f" % (
         gen, parallelism, mean, stdev, mean_per_operation))
+
+    print("First gen bb = %.2f" % first_bb_per_generation[0])
+    print("Mean bb across gen (excl 1st) = %.2f" % statistics.mean(first_bb_per_generation[1:]))
 
 
 def main():
