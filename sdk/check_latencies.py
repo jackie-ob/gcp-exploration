@@ -11,12 +11,8 @@ from google.cloud import storage
 TEST_BUCKET = "ob_gcp_exploration"
 
 
-def upload_download_delete_cycle(num_cycles_per_worker, profile=False):
+def upload_download_delete_cycle(num_cycles_per_worker, profile=False, credentials=None, project_id=None):
     t = time.time()
-
-    import google.auth
-
-    credentials, project_id = google.auth.default()
     storage_client = storage.Client(credentials=credentials, project=project_id)
     bucket = storage_client.bucket(TEST_BUCKET)
     if profile:
@@ -55,6 +51,7 @@ def do_it(num_generations, multiplier, use_processes, num_cycles_per_worker):
         pool = ThreadPoolExecutor(max_workers=max_workers)
 
     print("Warming up executor")
+
     warm_up_futures = []
     for _ in range(2 * max_workers):
         warm_up_futures.append(pool.submit(noop))
@@ -63,12 +60,16 @@ def do_it(num_generations, multiplier, use_processes, num_cycles_per_worker):
         f.result()
     print("Warm-up complete (took %.2f seconds)" % (time.time() - t))
 
+    import google.auth
+
+    credentials, project_id = google.auth.default()
+
     for gen in range(num_generations):
         parallelism = multiplier ** gen
         print("Processing generation %d (%d workers at a time)" % (gen, parallelism))
         futures = []
         for i in range(parallelism):
-            f = pool.submit(upload_download_delete_cycle, num_cycles_per_worker, profile=bool(i == 0))
+            f = pool.submit(upload_download_delete_cycle, num_cycles_per_worker, profile=bool(i == 0), credentials=credentials,project_id=project_id)
             futures.append(f)
         latencies = [f.result() for f in futures]
         mean = statistics.mean(latencies)
