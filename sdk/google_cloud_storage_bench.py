@@ -8,8 +8,6 @@ from random import randbytes
 import time
 import sys
 
-BLOB_ENDPOINT = "https://obbenchmark1.blob.core.windows.net/"
-
 
 class Measure(object):
     def __init__(self, name, data_size=None):
@@ -44,7 +42,6 @@ def generate_randbytes(size_mb: int):
     return result
 
 
-PARALLEL_BLOB_OPERATIONS = 10
 TEST_BLOB_FN = lambda n: "test-blob-%d" % n
 TEST_BUCKET = "ob_gcp_exploration"
 
