@@ -59,10 +59,10 @@ def do_it(num_generations, multiplier, use_processes, num_cycles_per_worker):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--num-generations', default=5)
-    parser.add_argument('--multiplier', default=2)
+    parser.add_argument('--num-generations', default=5, type=int)
+    parser.add_argument('--multiplier', default=2, type=int)
     parser.add_argument('--use-processes', action='store_true')
-    parser.add_argument('--num-cycles-per-worker', default=10)
+    parser.add_argument('--num-cycles-per-worker', default=10, type=int)
     args = parser.parse_args()
     do_it(args.num_generations, args.multiplier, args.use_processes, args.num_cycles_per_worker)
     return 0
