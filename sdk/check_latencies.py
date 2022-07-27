@@ -11,16 +11,26 @@ from google.cloud import storage
 TEST_BUCKET = "ob_gcp_exploration"
 
 
-def upload_download_delete_cycle(num_cycles_per_worker):
+def upload_download_delete_cycle(num_cycles_per_worker, profile=False):
     t = time.time()
+
     storage_client = storage.Client()
     bucket = storage_client.bucket(TEST_BUCKET)
+    if profile:
+        print("A: %.2f" % (time.time() - t))
     for _ in range(num_cycles_per_worker):
+        q = time.time()
         blob_name = "check_latencies_" + str(uuid.uuid4())
         blob = bucket.blob(blob_name)
         blob.upload_from_file(io.BytesIO(b''))
+        if profile:
+            print("B: %.2f" % (time.time() - q))
         assert len(blob.download_as_bytes()) == 0
+        if profile:
+            print("C: %.2f" % (time.time() - q))
         blob.delete()
+        if profile:
+            print("D: %.2f" % (time.time() - q))
     return time.time() - t
 
 
@@ -49,7 +59,7 @@ def do_it(num_generations, multiplier, use_processes, num_cycles_per_worker):
         print("Processing generation %d (%d workers at a time)" % (gen, parallelism))
         futures = []
         for i in range(parallelism):
-            f = pool.submit(upload_download_delete_cycle, num_cycles_per_worker)
+            f = pool.submit(upload_download_delete_cycle, num_cycles_per_worker, profile=bool(i == 0))
             futures.append(f)
         latencies = [f.result() for f in futures]
         mean = statistics.mean(latencies)
