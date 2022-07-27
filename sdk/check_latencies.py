@@ -36,8 +36,11 @@ def do_it(num_generations, multiplier, use_processes, num_cycles_per_worker):
         pool = ThreadPoolExecutor(max_workers=max_workers)
 
     print("Warming up executor")
+    warm_up_futures = []
     for _ in range(2 * max_workers):
-        pool.submit(noop)
+        warm_up_futures.append(pool.submit(noop))
+    for f in warm_up_futures:
+        f.result()
     print("Warm-up complete")
 
     for gen in range(num_generations):
