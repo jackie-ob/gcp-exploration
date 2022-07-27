@@ -10,10 +10,18 @@ from google.cloud import storage
 
 TEST_BUCKET = "ob_gcp_exploration"
 
+CACHED_CLIENT = None
 
-def upload_download_delete_cycle(num_cycles_per_worker, profile=False, credentials=None, project_id=None):
+
+def upload_download_delete_cycle(num_cycles_per_worker, profile=False, use_cached_client=False):
     t = time.time()
-    storage_client = storage.Client(credentials=credentials, project=project_id)
+    if use_cached_client:
+        global CACHED_CLIENT
+        if not CACHED_CLIENT:
+            CACHED_CLIENT = storage.Client()
+        storage_client = CACHED_CLIENT
+    else:
+        storage_client = storage.Client()
     bucket = storage_client.bucket(TEST_BUCKET)
     if profile:
         print("A: %.2f" % (time.time() - t))
@@ -48,8 +56,10 @@ def do_it(num_generations, multiplier, use_processes, num_cycles_per_worker):
     max_workers = multiplier ** (num_generations - 1)
     if use_processes:
         pool = ProcessPoolExecutor(max_workers=max_workers)
+        use_cached_client = True
     else:
         pool = ThreadPoolExecutor(max_workers=max_workers)
+        use_cached_client = False
 
     print("Warming up executor")
 
@@ -61,18 +71,12 @@ def do_it(num_generations, multiplier, use_processes, num_cycles_per_worker):
         f.result()
     print("Warm-up complete (took %.2f seconds)" % (time.time() - t))
 
-    import google.auth
-
-    s = time.time()
-    credentials, project_id = google.auth.default()
-    print("pre-cred time = %.2f" % (time.time() -s))
-
     for gen in range(num_generations):
         parallelism = multiplier ** gen
         print("Processing generation %d (%d workers at a time)" % (gen, parallelism))
         futures = []
         for i in range(parallelism):
-            f = pool.submit(upload_download_delete_cycle, num_cycles_per_worker, profile=bool(i == 0), credentials=credentials,project_id=project_id)
+            f = pool.submit(upload_download_delete_cycle, num_cycles_per_worker, profile=bool(i == 0), use_cached_client=use_cached_client)
             futures.append(f)
         latencies = [f.result() for f in futures]
         mean = statistics.mean(latencies)
