@@ -62,7 +62,9 @@ def do_it(num_generations, multiplier, use_processes, num_cycles_per_worker):
 
     import google.auth
 
+    s = time.time()
     credentials, project_id = google.auth.default()
+    print("pre-cred time = %.2f" % (time.time() -s))
 
     for gen in range(num_generations):
         parallelism = multiplier ** gen
