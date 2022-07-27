@@ -50,7 +50,7 @@ TEST_BUCKET = "ob_gcp_exploration"
 
 
 def simple_download(i, args):
-    with Measure('download', args.size_mn) as m:
+    with Measure('download', args.size_mb) as m:
         storage_client = storage.Client()
         bucket = storage_client.bucket(TEST_BUCKET)
         print("Downloading blob %s" % TEST_BLOB_FN(i))
