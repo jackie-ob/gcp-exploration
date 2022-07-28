@@ -20,10 +20,11 @@ def upload_one(name, data):
 def generate_randbytes(size: int):
     result = bytearray()
     size_remaining = size
+    batch_size = 10 * 1024 * 1024
     while size_remaining > 0:
-        if size_remaining >= 1024 * 1024:
-            result.extend(randbytes(1024 * 1024))
-            size_remaining -= 1024 * 1024
+        if size_remaining >= batch_size:
+            result.extend(randbytes(batch_size))
+            size_remaining -= batch_size
         else:
             result.extend(randbytes(size_remaining))
             size_remaining = 0
