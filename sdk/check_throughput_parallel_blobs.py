@@ -79,7 +79,7 @@ def main():
     args = parser.parse_args()
     if args.single_get_chunk_size:
         # dirty dirty dirty
-        google.resumable_media.requests._request_helpers._SINGLE_GET_CHUNK_SIZE = 256 * 1024
+        google.resumable_media.requests._request_helpers._SINGLE_GET_CHUNK_SIZE = args.single_get_chunk_size
     if args.use_processes:
         executor = ProcessPoolExecutor(max_workers=args.parallelism)
     else:
