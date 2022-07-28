@@ -5,6 +5,7 @@ import argparse
 import time
 import uuid
 import io
+from contextlib import contextmanager
 
 from google.cloud import storage
 
@@ -13,8 +14,30 @@ TEST_BUCKET = "ob_gcp_exploration"
 CACHED_CLIENT = None
 
 
-def upload_download_delete_cycle(num_cycles_per_worker, profile=False, use_cached_client=False):
-    t = time.time()
+@contextmanager
+def measure(label):
+    t0 = time.time()
+    splits = []
+
+    def add_split(split_label):
+        splits.append((split_label, time.time()))
+
+    try:
+        yield add_split
+    finally:
+        duration = time.time() - t0
+        print("%s %.3f" % (label, duration))
+        split_durations = [None] * len(splits)
+        for i in range(len(splits)):
+            if i == 0:
+                split_durations[i] = splits[i][1] - t0
+            else:
+                split_durations[i] = splits[i][1] - splits[i - 1][1]
+        for i, sd in enumerate(split_durations):
+            print("    %20s: %-.2f" % (splits[i][0], split_durations[i]))
+
+
+def upload_download_delete_cycles(num_cycles_per_worker, use_cached_client=False):
     if use_cached_client:
         global CACHED_CLIENT
         if not CACHED_CLIENT:
@@ -23,32 +46,18 @@ def upload_download_delete_cycle(num_cycles_per_worker, profile=False, use_cache
     else:
         storage_client = storage.Client()
     bucket = storage_client.bucket(TEST_BUCKET)
-    if profile:
-        print("A: %.2f" % (time.time() - t))
-
-    bbs = []
-    for _ in range(num_cycles_per_worker):
-        blob_name = "check_latencies_" + str(uuid.uuid4())
-        blob = bucket.blob(blob_name)
-        q1 = time.time()
-        blob.upload_from_file(io.BytesIO(b''))
-        q1point5 = time.time()
-        if profile:
-            print("BB: %.2f" % (q1point5 - q1))
-        bbs.append(q1point5 - q1)
-        blob.upload_from_file(io.BytesIO(b''))
-        q2 = time.time()
-        if profile:
-            print("B: %.2f" % (q2 - q1point5))
-        assert len(blob.download_as_bytes()) == 0
-        q3 = time.time()
-        if profile:
-            print("C: %.2f" % (q3 - q2))
-        blob.delete()
-        q4 = time.time()
-        if profile:
-            print("D: %.2f" % (q4 - q3))
-    return time.time() - t, bbs
+    for i in range(num_cycles_per_worker):
+        with measure("cycle_%d" % i) as m:
+            blob_name = "check_latencies_" + str(uuid.uuid4())
+            blob = bucket.blob(blob_name)
+            blob.upload_from_file(io.BytesIO(b''))
+            m("first_upload")
+            blob.upload_from_file(io.BytesIO(b''))
+            m("second_upload")
+            assert len(blob.download_as_bytes()) == 0
+            m("download")
+            blob.delete()
+            m("delete")
 
 
 def noop():
@@ -74,28 +83,14 @@ def do_it(num_generations, multiplier, use_processes, num_cycles_per_worker):
         f.result()
     print("Warm-up complete (took %.2f seconds)" % (time.time() - t))
 
-    first_bb_per_generation = []
     for gen in range(num_generations):
         parallelism = multiplier ** gen
         print("Processing generation %d (%d workers at a time)" % (gen, parallelism))
         futures = []
         for i in range(parallelism):
-            f = pool.submit(upload_download_delete_cycle, num_cycles_per_worker, profile=bool(i == 0), use_cached_client=False)
+            f = pool.submit(upload_download_delete_cycles, num_cycles_per_worker, use_cached_client=use_cached_client)
             futures.append(f)
-        results = [f.result() for f in futures]
-        latencies = [r[0] for r in results]
-        bbss = results[0][1]
-        first_bb_per_generation.append(bbss[0])
-        mean = statistics.mean(latencies)
-        stdev = -1
-        if len(latencies) > 1:
-            stdev = statistics.stdev(latencies)
-        mean_per_operation = mean / (num_cycles_per_worker * 3)
-        print("Gen %d (x %d): mean=%.3f stdev=%.3f mean_per_operation=%.3f" % (
-        gen, parallelism, mean, stdev, mean_per_operation))
-
-    print("First gen bb = %.2f" % first_bb_per_generation[0])
-    print("Mean bb across gen (excl 1st) = %.2f" % statistics.mean(first_bb_per_generation[1:]))
+        [f.result() for f in futures]
 
 
 def main():
