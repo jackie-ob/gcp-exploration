@@ -16,6 +16,19 @@ def upload_one(name, data):
     blob = bucket.blob(name)
     blob.upload_from_file(io.BytesIO(data))
 
+# This is really slow... but fast enough, so don't care
+def generate_randbytes(size: int):
+    result = bytearray()
+    size_remaining = size
+    while size_remaining > 0:
+        if size_remaining >= 1024 * 1024:
+            result.extend(randbytes(1024 * 1024))
+            size_remaining -= 1024 * 1024
+        else:
+            result.extend(randbytes(size_remaining))
+            size_remaining = 0
+    return result
+
 def just_do_it(total_size_mb, splits):
     assert splits <= 32
     assert total_size_mb < 1024 * 12  # cap at 12GB... we will keep everything in memory
@@ -26,9 +39,9 @@ def just_do_it(total_size_mb, splits):
     with measure("prepare_data"):
         for i in range(splits):
             if i < remainder_size:
-                contents.append(randbytes(size_per_chunk + 1))
+                contents.append(generate_randbytes(size_per_chunk + 1))
             else:
-                contents.append(randbytes(size_per_chunk))
+                contents.append(generate_randbytes(size_per_chunk))
 
     validate_total_size = sum(len(x) for x in contents)
     blob_prefix = str(uuid.uuid4())

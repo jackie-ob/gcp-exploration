@@ -17,7 +17,7 @@ def measure(label, work_qty=None, work_unit=None):
         print("%s %.3f" % (label, duration))
         if work_qty is not None:
             assert work_unit is not None
-            print("Rate: %.2f %sper second" % (work_qty/duration, work_unit))
+            print("Rate: %.2f %s per second" % (work_qty/duration, work_unit))
         split_durations = [None] * len(splits)
         for i in range(len(splits)):
             if i == 0:
