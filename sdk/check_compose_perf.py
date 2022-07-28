@@ -3,10 +3,9 @@ import os
 import uuid
 
 from google.cloud import storage
-import io
 from random import randbytes
 from measure import measure
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 TEST_BUCKET = "ob_gcp_exploration"
 
@@ -32,7 +31,7 @@ def generate_randbytes(size: int):
             size_remaining = 0
     return result
 
-def just_do_it(total_size_mb, splits):
+def just_do_it(total_size_mb, splits, use_processes):
     assert splits <= 32
     assert total_size_mb < 1024 * 12  # cap at 12GB... we will keep everything in memory
     total_size = total_size_mb * 1024 * 1024
@@ -58,7 +57,10 @@ def just_do_it(total_size_mb, splits):
 
     with measure("composite_upload", work_qty=total_size_mb, work_unit='MB'):
         with measure("upload_components"):
-            pool = ThreadPoolExecutor(max_workers=splits)
+            if use_processes:
+                pool = ThreadPoolExecutor(max_workers=splits)
+            else:
+                pool = ProcessPoolExecutor(max_workers=splits)
             futures = []
             for blob_name in contents:
                 f = pool.submit(upload_one, blob_name)
@@ -86,8 +88,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--total-size-mb', type=int, required=True)
     parser.add_argument('--splits', type=int, default=32)
+    parser.add_argument('--use-processes', action='store_true')
     args = parser.parse_args()
-    just_do_it(args.total_size_mb, args.splits)
+    just_do_it(args.total_size_mb, args.splits, args.use_processes)
 
 
 if __name__ == '__main__':
