@@ -1,4 +1,5 @@
 import argparse
+import os
 import uuid
 
 from google.cloud import storage
@@ -10,11 +11,12 @@ from concurrent.futures import ThreadPoolExecutor
 TEST_BUCKET = "ob_gcp_exploration"
 
 
-def upload_one(name, data):
+def upload_one(name):
     storage_client = storage.Client()
     bucket = storage_client.bucket(TEST_BUCKET)
     blob = bucket.blob(name)
-    blob.upload_from_file(io.BytesIO(data))
+    with open(name, 'rb') as f:
+        blob.upload_from_file(f)
 
 # This is really slow... but fast enough, so don't care
 def generate_randbytes(size: int):
@@ -37,28 +39,29 @@ def just_do_it(total_size_mb, splits):
     contents = []
     size_per_chunk = total_size // splits
     remainder_size = total_size % splits
+    blob_prefix = str(uuid.uuid4())
     with measure("prepare_data"):
         for i in range(splits):
+            blob_name = "%s_%d" % (blob_prefix, i)
             if i < remainder_size:
-                contents.append(generate_randbytes(size_per_chunk + 1))
+                data = generate_randbytes(size_per_chunk + 1)
             else:
-                contents.append(generate_randbytes(size_per_chunk))
+                data = generate_randbytes(size_per_chunk)
+            with open(blob_name, 'wb') as f:
+                f.write(data)
+            contents.append(blob_name)
 
-    validate_total_size = sum(len(x) for x in contents)
-    blob_prefix = str(uuid.uuid4())
+    validate_total_size = sum(os.path.getsize(x) for x in contents)
 
     assert validate_total_size == total_size
     print("Total size generated = %d" % total_size)
-    component_names = []
 
     with measure("composite_upload", work_qty=total_size_mb, work_unit='MB'):
         with measure("upload_components"):
             pool = ThreadPoolExecutor(max_workers=splits)
             futures = []
-            for i, b in enumerate(contents):
-                blob_name = "%s_%d" % (blob_prefix, i)
-                component_names.append(blob_name)
-                f = pool.submit(upload_one, blob_name, b)
+            for blob_name in contents:
+                f = pool.submit(upload_one, blob_name)
                 futures.append(f)
             for f in futures:
                 f.result()
@@ -67,12 +70,13 @@ def just_do_it(total_size_mb, splits):
             storage_client = storage.Client()
             bucket = storage_client.bucket(TEST_BUCKET)
             compose_blob = bucket.blob(blob_prefix)
-            compose_blob.compose([bucket.blob(c) for c in component_names])
+            compose_blob.compose([bucket.blob(c) for c in contents])
 
     with measure("cleanup"):
         storage_client = storage.Client()
         bucket = storage_client.bucket(TEST_BUCKET)
-        for c in component_names:
+        for c in contents:
+            os.remove(c)
             bucket.blob(c).delete()
         compose_blob = bucket.blob(blob_prefix)
         compose_blob.delete()
