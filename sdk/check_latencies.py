@@ -1,40 +1,16 @@
-import statistics
 import sys
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import argparse
 import time
 import uuid
 import io
-from contextlib import contextmanager
+from measure import measure
 
 from google.cloud import storage
 
 TEST_BUCKET = "ob_gcp_exploration"
 
 CACHED_CLIENT = None
-
-
-@contextmanager
-def measure(label):
-    t0 = time.time()
-    splits = []
-
-    def add_split(split_label):
-        splits.append((split_label, time.time()))
-
-    try:
-        yield add_split
-    finally:
-        duration = time.time() - t0
-        print("%s %.3f" % (label, duration))
-        split_durations = [None] * len(splits)
-        for i in range(len(splits)):
-            if i == 0:
-                split_durations[i] = splits[i][1] - t0
-            else:
-                split_durations[i] = splits[i][1] - splits[i - 1][1]
-        for i, sd in enumerate(split_durations):
-            print("    %20s: %-.2f" % (splits[i][0], split_durations[i]))
 
 
 def upload_download_delete_cycles(num_cycles_per_worker, use_cached_client=False):
@@ -97,7 +73,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--num-generations', default=5, type=int)
     parser.add_argument('--multiplier', default=2, type=int)
-    parser.add_argument('--use-processes', action='store_true')
+    parser.add_argument('--use-processes', action='store_true',
+                        help="If true, clients are cached, one per worker process.")
     parser.add_argument('--num-cycles-per-worker', default=10, type=int)
     args = parser.parse_args()
     do_it(args.num_generations, args.multiplier, args.use_processes, args.num_cycles_per_worker)
